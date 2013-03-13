@@ -1,3 +1,8 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// Copyrighted under the MPLv2 and LGPLv3 by Jesse Johnson.
+
 #include "BareOgre.h"
 
 #include <OgreCamera.h>
@@ -100,7 +105,6 @@ void BareOgre::createScene()
   // Add lighting.
   //mSceneMgr->setAmbientLight(Ogre::ColourValue(0.5,0.5,0.5));
   mSceneMgr->setAmbientLight(Ogre::ColourValue(1.0,1.0,1.0));
-
 
   Ogre::Light* l = mSceneMgr->createLight("MainLight");
   l->setPosition(20,80,50);

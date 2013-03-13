@@ -1,8 +1,16 @@
 OgreVox
 ==========
 
-Provides a bare framework for creating cross-platform Ogre 1.9 projects.  
-A simple example project is included to get you started.
+Provides a framework for creating cross-platform 3D voxel projects 
+in Ogre 1.9 using the PolyVox and Accidental Noise libraries.  
+
+A simple example project is included to get you started.  Facing the
+Ogre head at the center of the screen, volumes are placed in four
+quadrants:
+* upper-right: VoxelSphere
+* lower-right: LargeVoxelSphere
+* upper-left: VoxelTerrain
+* lower-left: VoxelPlanet
 
 Includes simple FPS controls via holocronweaver/BareOgre.
 
@@ -10,7 +18,8 @@ CMake is used to provide cross-platform compilation.
 
 Usage Instructions
 -------------------
-1. Install Ogre 1.9 and PolyVox 0.3.
+1. Install Ogre 1.9 and PolyVox 0.3.  The Accidental Noise library is
+included with Ogrevox.
 2. Modify CMakeLists.txt and configuration files in dist/bin for your
 project and system.
 3. Navigate into the folder storing your project and BareOgre.
@@ -25,9 +34,20 @@ to start the program.
 License
 ------------------
 The code is tweaked and enhanced from the Ogre Tutorial Framework available
-on the Ogre Wiki as a Public Domain work.  PolyVox portions are partially
-derived from the PolyVox Basic example which is under the zlib license.
+on the Ogre Wiki as a Public Domain work.  
 
-This code is released under the LGPLv3 license (see license/LICENSE.txt).
+PolyVox portions are partially derived from the PolyVox Basic example
+which is under the zlib license.
+
+The Accidental Noise Library included in this project is under the
+zlib license.
+
+This code is dual licensed under the MPLv2 and LGPLv3 licenses (see license folder).
+
+<!--
+Need MPLv2 logo.  Make my own?
+![MPLv2 logo](https://raw.github.com/holocronweaver/OgreVox/master/license/MPLv2.png)
 
 ![LGPLv3 logo](https://raw.github.com/holocronweaver/OgreVox/master/license/LGPLv3.png)
+-->
+

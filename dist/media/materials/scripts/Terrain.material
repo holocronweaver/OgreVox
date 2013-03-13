@@ -1,0 +1,48 @@
+vertex_program TerrainVertex glsl
+{
+    source TerrainVertex.vert 
+    entry_point main
+    syntax arbvp1
+    
+    default_params
+    {
+    	param_named_auto p_mvp worldviewproj_matrix 
+  	param_named_auto p_m world_matrix
+    }
+}
+
+fragment_program TerrainFragment glsl
+{
+    source TerrainFragment.frag 
+    entry_point main
+    syntax arbfp1
+    
+    default_params
+    {
+      param_named_auto p_lightPos light_position 0
+    }
+}
+
+material SimpleTexture
+{
+  technique
+  {
+    pass
+    {  
+      
+      vertex_program_ref TerrainVertex
+      {
+      }
+      
+      fragment_program_ref TerrainFragment
+      {
+          param_named p_diffuse int 0
+      }
+      
+      texture_unit
+      {
+        texture terrain_texture.jpg
+      }
+    }   
+  }
+}
