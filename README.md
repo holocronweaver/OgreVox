@@ -19,12 +19,11 @@ CMake is used to provide cross-platform compilation.
 Usage Instructions
 -------------------
 1. Install Ogre 1.9 and PolyVox 0.3.  The Accidental Noise library is
-included with Ogrevox.
+included with OgreVox.
 2. Modify CMakeLists.txt and configuration files in dist/bin for your
 project and system.
-3. Navigate into the folder storing your project and BareOgre.
-4. Use `cmake .` to produce the appropriate compilation or project files for
-your system.
+3. Use `cmake .` in the root project folder to produce the appropriate 
+compilation or project files for your system.
 5. Compile the code using the files produced by CMake.
 6. Either run the exectable or the Python script `run.py` in dist/bin
 to start the program.
