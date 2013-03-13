@@ -1,0 +1,1084 @@
+// tolua++ Binding package for Accidental Noise Library
+
+$#include "anl.h"
+$#include "rasterization.h"
+
+namespace anl
+{
+	enum EMappingModes
+    {
+        SEAMLESS_NONE,
+        SEAMLESS_X,
+        SEAMLESS_Y,
+        SEAMLESS_Z,
+        SEAMLESS_XY,
+        SEAMLESS_XZ,
+        SEAMLESS_YZ,
+        SEAMLESS_XYZ
+    };
+	
+	enum EBasisTypes
+    {
+        VALUE,
+        GRADIENT,
+        GRADVAL,
+        SIMPLEX,
+        WHITE
+    };
+
+    enum EInterpTypes
+    {
+        NONE,
+        LINEAR,
+        CUBIC,
+        QUINTIC
+    };
+	
+	enum ECombinerTypes
+    {
+        ADD,
+        MULT,
+        MAX,
+        MIN,
+        AVG
+    };
+	
+	enum EColorOperations
+    {
+        COLORMULTIPLY,
+        COLORADD,
+        SCREEN,
+        OVERLAY,
+        SOFTLIGHT,
+        HARDLIGHT,
+        DODGE,
+        BURN,
+        LINEARDODGE,
+        LINEARBURN
+    };
+	
+	enum EFractalTypes
+    {
+        FBM,
+        RIDGEDMULTI,
+        BILLOW,
+        MULTI,
+        HYBRIDMULTI,
+		DECARPENTIERSWISS
+	};
+	
+	enum EFunctionGradientAxis
+    {
+        X_AXIS,
+        Y_AXIS,
+        Z_AXIS,
+        W_AXIS,
+        U_AXIS,
+        V_AXIS
+    };
+	
+	enum CompositeChannelsMode
+    {
+        RGB,
+        HSV
+    };
+	
+	class CImplicitModuleBase
+	{
+		public:
+		void setDerivSpacing(double s);
+		virtual void setSeed(unsigned int seed);
+
+		virtual double get(double x, double y)=0;
+		virtual double get(double x, double y, double z)=0;
+		virtual double get(double x, double y, double z, double w)=0;
+		virtual double get(double x, double y, double z, double w, double u, double v)=0;
+		
+		double get_dx(double x, double y);
+		double get_dy(double x, double y);
+
+		double get_dx(double x, double y, double z);
+		double get_dy(double x, double y, double z);
+		double get_dz(double x, double y, double z);
+
+		double get_dx(double x, double y, double z, double w);
+		double get_dy(double x, double y, double z, double w);
+		double get_dz(double x, double y, double z, double w);
+		double get_dw(double x, double y, double z, double w);
+
+		double get_dx(double x, double y, double z, double w, double u, double v);
+		double get_dy(double x, double y, double z, double w, double u, double v);
+		double get_dz(double x, double y, double z, double w, double u, double v);
+		double get_dw(double x, double y, double z, double w, double u, double v);
+		double get_du(double x, double y, double z, double w, double u, double v);
+		double get_dv(double x, double y, double z, double w, double u, double v);
+	};
+	
+	
+	
+	class CBasePRNG
+    {
+        public:
+        virtual unsigned int get();
+        virtual void setSeed(unsigned int s);
+        void setSeedTime();
+        unsigned int getTarget(unsigned int t);
+        unsigned int getRange(unsigned int low, unsigned int high);
+        double get01();
+    };
+	
+	class LCG : public CBasePRNG
+    {
+        public:
+        LCG();
+		~LCG();
+    };
+
+    // The following generators are based on generators created by George Marsaglia
+    // They use the static lcg created above for seeding, to initialize various
+    // state and tables. Seeding them is a bit more involved than an LCG.
+    class Xorshift : public CBasePRNG
+    {
+        public:
+        Xorshift();
+		Xorshift();
+    };
+
+    class MWC256 : public CBasePRNG
+    {
+        public:
+        MWC256();
+		~MWC256();
+    };
+
+    class CMWC4096 : public CBasePRNG
+    {
+        public:
+        CMWC4096();
+		~CMWC4096();
+    };
+
+    class KISS : public CBasePRNG
+    {
+        public:
+        KISS();
+		~KISS();
+    };
+	
+	class CRGBAModuleBase
+    {
+        public:
+        void setSeed(unsigned int){};
+
+        virtual SRGBA get(double x, double y)=0;
+        virtual SRGBA get(double x, double y, double z)=0;
+        virtual SRGBA get(double x, double y, double z, double w)=0;
+        virtual SRGBA get(double x, double y, double z, double w, double u, double v)=0;
+    };
+	
+	
+	// Implicit modules
+	class CImplicitAutoCorrect : public CImplicitModuleBase
+    {
+        public:
+        CImplicitAutoCorrect();
+        CImplicitAutoCorrect(double low, double high);
+        ~CImplicitAutoCorrect(){}
+
+        void setSource(CImplicitModuleBase *m);
+        void setRange(double low, double high);
+        void calculate();
+	};
+	
+	class CImplicitBasisFunction : public CImplicitModuleBase
+    {
+        public:
+        CImplicitBasisFunction();
+        CImplicitBasisFunction(int type, int interp);
+		~CImplicitBasisFunction();
+
+        void setType(int type);
+        void setInterp(int interp);
+        void setRotationAngle(double ax, double ay, double az, double angle);
+
+        void setSeed(unsigned int seed);
+	};
+	
+	class CImplicitBias : public CImplicitModuleBase
+	{
+		public:
+		CImplicitBias(double b);
+		~CImplicitBias();
+
+		void setSource(CImplicitModuleBase *b);
+		void setSource(double s);
+		void setBias(double b);
+		void setBias(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitBlend : public CImplicitModuleBase
+    {
+    public:
+        CImplicitBlend();
+        ~CImplicitBlend();
+
+        void setLowSource(CImplicitModuleBase *b);
+        void setHighSource(CImplicitModuleBase *b);
+        void setControlSource(CImplicitModuleBase *b);
+        void setLowSource(double v);
+        void setHighSource(double v);
+        void setControlSource(double v);
+	};
+	
+	class CImplicitBrightContrast : public CImplicitModuleBase
+    {
+        public:
+        CImplicitBrightContrast();
+        ~CImplicitBrightContrast();
+
+        void setSource(CImplicitModuleBase *m);
+        void setSource(double v);
+
+        void setBrightness(double b);
+        void setContrastThreshold(double t);
+        void setContrastFactor(double t);
+        void setBrightness(CImplicitModuleBase *m);
+        void setContrastThreshold(CImplicitModuleBase *m);
+        void setContrastFactor(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitCache : public CImplicitModuleBase
+    {
+        public:
+        CImplicitCache();
+        ~CImplicitCache();
+
+        void setSource(CImplicitModuleBase *m);
+		void setSource(double v);
+	};
+	
+	class CCellularGenerator
+	{
+		public:
+		CCellularGenerator();
+		~CCellularGenerator();
+		
+		void setSeed(unsigned int);
+	};
+	
+	class CImplicitCellular : public CImplicitModuleBase
+	{
+		public:
+		CImplicitCellular();
+		CImplicitCellular(double a, double b, double c, double d);
+		~CImplicitCellular();
+
+		void setCoefficients(double a, double b, double c, double d);
+		void setCellularSource(CCellularGenerator *m);
+	};
+	
+	class CImplicitClamp : public CImplicitModuleBase
+    {
+        public:
+        CImplicitClamp(double low, double high);
+        ~CImplicitClamp();
+
+        void setRange(double low, double high);
+        void setSource(CImplicitModuleBase *b);
+	};
+	
+	class CImplicitCombiner : public CImplicitModuleBase
+    {
+        public:
+        CImplicitCombiner(unsigned int type);
+		~CImplicitCombiner();
+		
+        void setType(unsigned int type);
+        void clearAllSources();
+        void setSource(int which, CImplicitModuleBase *b);
+	};
+	
+	class CImplicitConstant : public CImplicitModuleBase
+    {
+        public:
+		CImplicitConstant();
+        CImplicitConstant(double c);
+        ~CImplicitConstant();
+
+        void setConstant(double c);
+	};
+	
+	class CImplicitCos : public CImplicitModuleBase
+    {
+        public:
+        CImplicitCos();
+        ~CImplicitCos();
+
+        void setSource(double v);
+        void setSource(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitCurve : public CImplicitModuleBase
+	{
+		public:
+		CImplicitCurve();
+		~CImplicitCurve();
+		
+		void pushPoint(double t, double v);
+        void clearCurve();
+        void setSource(double t);
+        void setSource(CImplicitModuleBase *m);
+        void setInterpType(int type);
+	};
+	
+	class CImplicitFloor : public CImplicitModuleBase
+	{
+		CImplicitFloor();
+		~CImplicitFloor();
+		
+		void setSource(double v);
+		void setSource(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitExtractRGBAChannel : public CImplicitModuleBase
+    {
+        public:
+        CImplicitExtractRGBAChannel();
+        CImplicitExtractRGBAChannel(int channel);
+		~CImplicitExtractRGBAChannel();
+
+        void setSource(CRGBAModuleBase *m);
+        void setSource(float r, float g, float b, float a);
+
+        void setChannel(int channel);
+	};
+	
+	class CImplicitFractal : public CImplicitModuleBase
+    {
+        public:
+        CImplicitFractal(unsigned int type, unsigned int basistype, unsigned int interptype);
+
+        void setNumOctaves(int n);
+        void setFrequency(double f);
+        void setLacunarity(double l);
+        void setGain(double g);
+        void setOffset(double o);
+        void setH(double h);
+
+        void setType(unsigned int t);
+        void setAllSourceTypes(unsigned int basis_type, unsigned int interp);
+        void setSourceType(int which, unsigned int type, unsigned int interp);
+        void overrideSource(int which, CImplicitModuleBase *b);
+        void resetSource(int which);
+        void resetAllSources();
+        void setSeed(unsigned int seed);
+        CImplicitBasisFunction *getBasis(int which);
+	};
+	
+	class CImplicitFunctionGradient : public CImplicitModuleBase
+    {
+        public:
+        CImplicitFunctionGradient();
+        ~CImplicitFunctionGradient();
+
+        void setSource(double v);
+        void setSource(CImplicitModuleBase *m);
+        void setAxis(int axis);
+        void setSpacing(double s);
+	};
+	
+	class CImplicitGain : public CImplicitModuleBase
+	{
+		public:
+		CImplicitGain(double b);
+		~CImplicitGain();
+
+		void setSource(double v);
+		void setSource(CImplicitModuleBase *b);
+		void setGain(double b);
+		void setGain(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitGradient : public CImplicitModuleBase
+    {
+        public:
+        CImplicitGradient();
+        ~CImplicitGradient();
+
+        void setGradient(double x1, double x2, double y1, double y2, double z1=0, double z2=0,
+        double w1=0, double w2=0, double u1=0, double u2=0, double v1=0, double v2=0);
+	};
+	
+	class CImplicitMagnitude : public CImplicitModuleBase
+	{
+		public:
+		CImplicitMagnitude();
+		~CImplicitMagnitude();
+
+		void setX(double f);
+		void setY(double f);
+		void setZ(double f);
+		void setW(double f);
+		void setU(double f);
+		void setV(double f);
+
+		void setX(CImplicitModuleBase *f);
+		void setY(CImplicitModuleBase *f);
+		void setZ(CImplicitModuleBase *f);
+		void setW(CImplicitModuleBase *f);
+		void setU(CImplicitModuleBase *f);
+		void setV(CImplicitModuleBase *f);
+	};
+	
+	class CImplicitNormalizeCoords : public CImplicitModuleBase
+	{
+		public:
+		CImplicitNormalizeCoords();
+        CImplicitNormalizeCoords(float length);
+		~CImplicitNormalizeCoords();
+
+        void setSource(double v);
+        void setSource(CImplicitModuleBase *v);
+
+        void setLength(double v);
+        void setLength(CImplicitModuleBase *v);
+	};
+	
+	class CImplicitRGBADotProduct : public CImplicitModuleBase
+	{
+		public:
+        CImplicitRGBADotProduct();
+        ~CImplicitRGBADotProduct();
+
+        void setSource1(CRGBAModuleBase *m);
+        void setSource1(float r, float g, float b, float a);
+        void setSource2(CRGBAModuleBase *m);
+        void setSource2(float r, float g, float b, float a);
+	};
+	
+	class CImplicitRotateDomain : public CImplicitModuleBase
+	{
+		public:
+		CImplicitRotateDomain(double ax, double ay, double az, double angle_deg);
+		~CImplicitRotateDomain();
+		void setSource(CImplicitModuleBase *m);
+		void setSource(double v);
+		void setAxis(double ax, double ay, double az);
+		void setAxis(CImplicitModuleBase *ax, CImplicitModuleBase *ay, CImplicitModuleBase *az);
+		void setAxisX(double ax);
+		void setAxisY(double ay);
+		void setAxisZ(double az);
+		void setAxisX(CImplicitModuleBase *ax);
+		void setAxisY(CImplicitModuleBase *ay);
+		void setAxisZ(CImplicitModuleBase *az);
+
+		void setAngle(double a);
+		void setAngle(CImplicitModuleBase *a);
+	};
+	
+	class CImplicitSawtooth : public CImplicitModuleBase
+	{
+		public:
+		CImplicitSawtooth(double period);
+		~CImplicitSawtooth();
+
+		void setSource(CImplicitModuleBase *s);
+		void setSource(double s);
+		void setPeriod(CImplicitModuleBase *p);
+		void setPeriod(double p);
+	};
+	
+	class CImplicitScaleDomain : public CImplicitModuleBase
+	{
+		public:
+		CImplicitScaleDomain();
+		CImplicitScaleDomain(double x, double y, double z=1, double w=1, double u=1, double v=1);
+		~CImplicitScaleDomain();
+		
+		void setScale(double x, double y, double z=1, double w=1, double u=1, double v=1);
+		void setXScale(double x);
+		void setYScale(double x);
+		void setZScale(double x);
+		void setWScale(double x);
+		void setUScale(double x);
+		void setVScale(double x);
+		void setXScale(CImplicitModuleBase *x);
+		void setYScale(CImplicitModuleBase *y);
+		void setZScale(CImplicitModuleBase *z);
+		void setWScale(CImplicitModuleBase *w);
+		void setUScale(CImplicitModuleBase *u);
+		void setVScale(CImplicitModuleBase *v);
+
+		void setSource(CImplicitModuleBase *m);
+		void setSource(double v);
+	};
+	
+	class CImplicitScaleOffset : public CImplicitModuleBase
+	{
+		public:
+		CImplicitScaleOffset(double scale, double offset);
+		~CImplicitScaleOffset();
+
+		void setSource(CImplicitModuleBase *b);
+		void setSource(double v);
+		void setScale(double scale);
+		void setOffset(double offset);
+		void setScale(CImplicitModuleBase *scale);
+		void setOffset(CImplicitModuleBase *offset);
+	};
+	
+	class CImplicitSelect : public CImplicitModuleBase
+	{
+		public:
+		CImplicitSelect();
+		~CImplicitSelect();
+		void setLowSource(CImplicitModuleBase *b);
+		void setHighSource(CImplicitModuleBase *b);
+		void setControlSource(CImplicitModuleBase *b);
+		void setLowSource(double v);
+		void setHighSource(double v);
+		void setControlSource(double v);
+		void setThreshold(double t);
+		void setFalloff(double f);
+		void setThreshold(CImplicitModuleBase *m);
+		void setFalloff(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitSin : public CImplicitModuleBase
+    {
+        public:
+        CImplicitSin();
+        ~CImplicitSin();
+
+        void setSource(double v);
+        void setSource(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitSphere : public CImplicitModuleBase
+	{
+		public:
+		CImplicitSphere();
+		~CImplicitSphere();
+		void setCenter(double cx,double cy,double cz=0,double cw=0,double cu=0,double cv=0);
+		void setCenterX(double cx);
+		void setCenterY(double cy);
+		void setCenterZ(double cz);
+		void setCenterW(double cw);
+		void setCenterU(double cu);
+		void setCenterV(double cv);
+		void setCenterX(CImplicitModuleBase *cx);
+		void setCenterY(CImplicitModuleBase *cy);
+		void setCenterZ(CImplicitModuleBase *cz);
+		void setCenterW(CImplicitModuleBase *cw);
+		void setCenterU(CImplicitModuleBase *cu);
+		void setCenterV(CImplicitModuleBase *cv);
+
+		void setRadius(double r);
+		void setRadius(CImplicitModuleBase *r);
+	};
+	
+	class CImplicitPow : public CImplicitModuleBase
+	{
+		public:
+		CImplicitPow();
+		~CImplicitPow();
+		
+		void setSource(double v);
+		void setSource(CImplicitModuleBase *m);
+		void setPower(double v);
+		void setPower(CImplicitModuleBase *m);
+	};
+	
+	class CImplicitTiers : public CImplicitModuleBase
+    {
+        public:
+        CImplicitTiers();
+        CImplicitTiers(int numtiers, bool smooth);
+        ~CImplicitTiers();
+
+        void setSource(double v);
+        void setSource(CImplicitModuleBase *m);
+        void setNumTiers(int numtiers);
+        void setSmooth(bool smooth);
+	};
+	
+	class CImplicitTranslateDomain : public CImplicitModuleBase
+    {
+        public:
+        CImplicitTranslateDomain();
+        ~CImplicitTranslateDomain();
+
+        void setXAxisSource(CImplicitModuleBase *m);
+        void setYAxisSource(CImplicitModuleBase *m);
+        void setZAxisSource(CImplicitModuleBase *m);
+        void setWAxisSource(CImplicitModuleBase *m);
+        void setUAxisSource(CImplicitModuleBase *m);
+        void setVAxisSource(CImplicitModuleBase *m);
+
+        void setXAxisSource(double v);
+        void setYAxisSource(double v);
+        void setZAxisSource(double v);
+        void setWAxisSource(double v);
+        void setUAxisSource(double v);
+        void setVAxisSource(double v);
+
+        void setSource(CImplicitModuleBase *m);
+        void setSource(double v);
+	};
+	
+	class CImplicitTriangle : public CImplicitModuleBase
+    {
+        public:
+        CImplicitTriangle(double period, double offset);
+        ~CImplicitTriangle();
+
+        void setSource(double s);
+        void setSource(CImplicitModuleBase *s);
+        void setPeriod(double p);
+        void setPeriod(CImplicitModuleBase *p);
+        void setOffset(double o);
+        void setOffset(CImplicitModuleBase *o);
+	};
+	
+	
+	
+	// RGBA Functions
+	class CRGBABlend : public CRGBAModuleBase
+    {
+        public:
+        CRGBABlend();
+        ~CRGBABlend();
+
+        void setLowSource(CRGBAModuleBase *m);
+        void setHighSource(CRGBAModuleBase *m);
+        void setLowSource(float r, float g, float b, float a);
+        void setHighSource(float r, float g, float b, float a);
+        void setControlSource(CImplicitModuleBase *m);
+        void setControlSource(double v);
+	};
+	
+	class CRGBABlendOps : public CRGBAModuleBase
+    {
+        public:
+        CRGBABlendOps();
+        CRGBABlendOps(int src1mode, int src2mode);
+        ~CRGBABlendOps();
+
+        void setSrc1Mode(int mode);
+        void setSrc2Mode(int mode);
+        void setSource1(CRGBAModuleBase *m);
+        void setSource2(CRGBAModuleBase *m);
+        void setSource1(float r, float g, float b, float a);
+        void setSource2(float r, float g, float b, float a);
+	};
+	
+	class CRGBAColorOps : public CRGBAModuleBase
+    {
+        public:
+        CRGBAColorOps();
+        CRGBAColorOps(int op);
+        ~CRGBAColorOps();
+
+        void setOperation(int op);
+
+        void setSource1(float r, float g, float b, float a);
+        void setSource1(CRGBAModuleBase *m);
+        void setSource2(float r, float g, float b, float a);
+        void setSource2(CRGBAModuleBase *m);
+	};
+	
+	class CRGBACompositeChannels : public CRGBAModuleBase
+    {
+        public:
+        CRGBACompositeChannels();
+        CRGBACompositeChannels(int mode);
+        ~CRGBACompositeChannels();
+
+        void setMode(int mode){m_mode=mode;}
+
+        void setRedSource(CImplicitModuleBase *m);
+        void setGreenSource(CImplicitModuleBase *m);
+        void setBlueSource(CImplicitModuleBase *m);
+        void setHueSource(CImplicitModuleBase *m);
+        void setSatSource(CImplicitModuleBase *m);
+        void setValSource(CImplicitModuleBase *m);
+        void setAlphaSource(CImplicitModuleBase *m);
+
+        void setRedSource(double r);
+        void setGreenSource(double g);
+        void setBlueSource(double b);
+        void setAlphaSource(double a);
+        void setHueSource(double h);
+        void setSatSource(double s);
+        void setValSource(double v);
+	};
+	
+	class CRGBACurve : public CRGBAModuleBase
+    {
+        public:
+        CRGBACurve();
+        ~CRGBACurve();
+
+        void pushPoint(double t, float r, float g, float b, float a);
+        void clearCurve();
+        void setSource(double t);
+        void setSource(CImplicitModuleBase *m);
+        void setInterpType(int type);
+	};
+	
+	class CRGBAConstant : public CRGBAModuleBase
+    {
+        public:
+        CRGBAConstant();
+        CRGBAConstant(SRGBA &r);
+        CRGBAConstant(float r, float g, float b, float a);
+        ~CRGBAConstant();
+
+        void set(float r, float g, float b, float a);
+        void set(SRGBA &r);
+	};
+	
+	class CRGBAHSVToRGBA :public CRGBAModuleBase
+    {
+        public:
+        CRGBAHSVToRGBA();
+
+        void setSource(CRGBAModuleBase *m);
+        void setSource(float r, float g, float b, float a);
+	};
+	
+	class CRGBAImplicitGrayscale : public CRGBAModuleBase
+    {
+        public:
+        CRGBAImplicitGrayscale();
+        ~CRGBAImplicitGrayscale();
+
+        void setSource(CImplicitModuleBase *m);
+	};
+	
+	class CRGBANormalize : public CRGBAModuleBase
+	{
+		public:
+		CRGBANormalize();
+		~CRGBANormalize();
+		void setSource(CRGBAModuleBase *m);
+		void setSource(float r, float g, float b, float a);
+	};
+	
+	class CRGBARGBAToHSV :public CRGBAModuleBase
+    {
+        public:
+        CRGBARGBAToHSV();
+
+        void setSource(CRGBAModuleBase *m);
+        void setSource(float r, float g, float b, float a);
+	};
+	
+	class CRGBARotateColor : public CRGBAModuleBase
+    {
+        public:
+        CRGBARotateColor();
+        void setAxis(double ax, double ay, double az);
+        void setAxis(CImplicitModuleBase *ax, CImplicitModuleBase *ay, CImplicitModuleBase *az);
+        void setAxisX(double ax);
+        void setAxisY(double ay);
+        void setAxisZ(double az);
+        void setAxisX(CImplicitModuleBase *ax);
+        void setAxisY(CImplicitModuleBase *ay);
+        void setAxisZ(CImplicitModuleBase *az);
+
+        void setNormalizeAxis(bool n){m_normalizeaxis=n;}
+
+        void setAngle(double a);
+        void setAngle(CImplicitModuleBase *a);
+
+        void setSource(CRGBAModuleBase *m);
+        void setSource(float r, float g, float b, float a);
+	};
+	
+	class CRGBASelect : public CRGBAModuleBase
+    {
+        public:
+        CRGBASelect();
+        CRGBASelect(double thresh, double fall);
+
+        void setLowSource(CRGBAModuleBase *m);
+        void setHighSource(CRGBAModuleBase *m);
+        void setLowSource(float r, float g, float b, float a);
+        void setHighSource(float r, float g, float b, float a);
+        void setControlSource(CImplicitModuleBase *m);
+        void setThreshold(CImplicitModuleBase *m);
+        void setFalloff(CImplicitModuleBase *m);
+        void setControlSource(double v);
+        void setThreshold(double v);
+        void setFalloff(double v);
+	};
+
+};
+
+namespace anl
+{
+	struct SMappingRanges
+    {
+        double mapx0,mapy0,mapz0, mapx1,mapy1,mapz1;
+        double loopx0,loopy0,loopz0, loopx1,loopy1,loopz1;
+
+        SMappingRanges();
+		~SMappingRanges();
+    };
+	
+	void map2D(int seamlessmode, CArray2Dd &a, CImplicitModuleBase &m, SMappingRanges &ranges, double z);
+    void map2DNoZ(int seamlessmode, CArray2Dd &a, CImplicitModuleBase &m, SMappingRanges &ranges);
+    void map3D(int seamlessmode, CArray3Dd &a, CImplicitModuleBase &m, SMappingRanges &ranges);
+
+    void mapRGBA2D(int seamlessmode, CArray2Drgba &a, CRGBAModuleBase &m, SMappingRanges &ranges, double z);
+    void mapRGBA2DNoZ(int seamlessmode, CArray2Drgba &a, CRGBAModuleBase &m, SMappingRanges &ranges);
+    void mapRGBA3D(int seamlessmode, CArray3Drgba &a, CRGBAModuleBase &m, SMappingRanges &ranges);
+	
+	void saveDoubleArray(char *filename, CArray2Dd *array);
+    void saveRGBAArray(char *filename, CArray2Drgba *array);
+};
+
+// Utility stuff
+
+namespace anl
+{
+/*class CArray2Dd
+{
+	public:
+	CArray2Dd();
+	CArray2Dd(int w, int h);
+	~CArray2Dd();
+	
+	int width();
+	int height();
+	void resize(int w, int h);
+	void set(int x, int y, double v);
+	double get(int x, int y);
+};
+
+class CArray2Drgba
+{
+	public:
+	CArray2Drgba();
+	CArray2Drgba(int w, int h);
+	~CArray2Drgba();
+	
+	int width();
+	int height();
+	void resize(int w, int h);
+	void set(int x, int y, anl::SRGBA v);
+	anl::SRGBA get(int x, int y);
+};*/
+
+class CVec2f
+{
+	public:
+	CVec2f();  
+    ~CVec2f(); 
+    CVec2f(int a);   
+    CVec2f(float a);   
+    CVec2f(const CVec2f &tvec);
+    CVec2f(const float t1, const float t2);
+	
+	const float dotprod(const CVec2f &tvec);
+    const float length();
+    void normalize();
+    void set(float v1, float v2);
+    
+    tolua_property float x;
+    tolua_property float y;
+};
+
+class CVec3f
+{
+    public:
+    CVec3f();  
+    ~CVec3f(); 
+    CVec3f(int a);   
+    CVec3f(float a);   
+    CVec3f(const CVec3f &tvec);
+    CVec3f(const float t1, const float t2, const float t3);
+   
+    
+    const float dotprod(const CVec3f &tvec);
+    const float length();
+    void normalize();
+    void set(float v1, float v2, float v3);
+    
+    tolua_property float x;
+    tolua_property float y;
+    tolua_property float z;
+};
+
+class CVec2i
+{
+	CVec2i();
+	CVec2i(int a);
+	CVec2i(const CVec2i &tvec);
+	CVec2i(const int t1, const int t2);
+	
+	tolua_property int x;
+	tolua_property int y;
+};
+
+class CVec3i
+{
+	CVec3i();
+	CVec3i(int a);
+	CVec3i(const CVec3i &tvec);
+	CVec3i(const int t1, const int t2, const int t3);
+	
+	tolua_property int x;
+	tolua_property int y;
+	tolua_property int z;
+};   
+
+class CVec4i
+{
+	CVec4i();
+	CVec4i(int a);
+	CVec4i(const CVec4i &tvec);
+	CVec4i(const int t1, const int t2, const int t3, const int t4);
+	
+	tolua_property int x;
+	tolua_property int y;
+	tolua_property int z;
+	tolua_property int w;
+
+};
+
+class SRGBA
+{
+	 SRGBA();
+	 SRGBA(int a);
+	 SRGBA(const  SRGBA &tvec);
+	 SRGBA(const float t1, const float t2, const float t3, const float t4);
+	
+	tolua_property float x;
+	tolua_property float y;
+	tolua_property float z;
+	tolua_property float w;
+
+};
+
+class CArray2Dd
+{
+  CArray2Dd(int w, int h);
+  CArray2Dd();
+  ~CArray2Dd();
+  void resize(int w, int h);
+  void destroy();
+  int width();
+  int height();
+  void set(int x, int y, double v);
+  double get(int x, int y);
+  double get(float x, float y);
+  double getIndexed(unsigned c);
+  void fill(float v);
+  void copyFrom(CArray2Dd *b);
+  void addArray(CArray2Dd *b);
+  void subtractArray(CArray2Dd *b);
+  void multiplyArray(CArray2Dd *b);
+  void copyFromSub(CArray2Dd *b, int x, int y);
+  void addArraySub(CArray2Dd *b, int x, int y);
+  void subtractArraySub(CArray2Dd *b, int x, int y);
+  void multiplyArraySub(CArray2Dd *b, int x, int y);
+  void scale(float s);
+  double getMax();
+  double getMin();
+  void scaleToRange(float low, float high);
+  void wrapCoords(int &x, int &y);
+  void rasterTriangleSmooth(CVec2i vec1, double v1, CVec2i vec2, double v2,
+            CVec2i vec3, double v3, int mode);
+  void rasterTriangleTex(CArray2Dd *src1,
+      CVec4i vec1, CVec4i vec2, CVec4i vec3, int mode);
+        void offset(int ox, int oy);
+  void flipVertical();
+  void flipHorizontal();
+  void blur(float,bool);
+};
+
+class CArray2Drgba
+{
+  CArray2Drgba(int w, int h);
+  CArray2Drgba();
+  ~CArray2Drgba();
+  void resize(int w, int h);
+  void destroy();
+  int width();
+  int height();
+  void set(int x, int y, SRGBA v);
+  SRGBA get(int x, int y);
+  SRGBA get(float x, float y);
+  SRGBA getIndexed(unsigned c);
+  void fill(SRGBA v);
+  void copyFrom(CArray2Drgba *b);
+  void addArray(CArray2Drgba *b);
+  void subtractArray(CArray2Drgba *b);
+  void multiplyArray(CArray2Drgba *b);
+  void copyFromSub(CArray2Drgba *b, int x, int y);
+  void addArraySub(CArray2Drgba *b, int x, int y);
+  void subtractArraySub(CArray2Drgba *b, int x, int y);
+  void multiplyArraySub(CArray2Drgba *b, int x, int y);
+  void scale(SRGBA s);
+  void wrapCoords(int &x, int &y);
+  void rasterTriangleSmooth(CVec2i vec1, SRGBA v1, CVec2i vec2, SRGBA v2,
+            CVec2i vec3, SRGBA v3, int mode);
+  void rasterTriangleTex(CArray2Drgba *src1, CVec4i vec1, CVec4i vec2, CVec4i vec3, int mode);
+        void offset(int ox, int oy);
+  void flipVertical();
+  void flipHorizontal();
+  void blur(float,bool);
+};
+
+
+class CArray3Dd
+{
+	public:
+	CArray3Dd();
+	CArray3Dd(int w, int h, int d);
+	~CArray3Dd();
+	
+	int width();
+	int height();
+	int depth();
+	
+	void set(int x, int y, int z, double v);
+	double get(int x, int y, int z);
+	void resize(int w, int h, int d);
+};
+
+class CArray3Drgba
+{
+	public:
+	CArray3Drgba();
+	CArray3Drgba(int w, int h, int d);
+	~CArray3Drgba();
+	
+	int width();
+	int height();
+	int depth();
+	
+	void resize(int w, int h, int d);
+	void set(int x, int y, int z, anl::SRGBA v);
+	anl::SRGBA get(int x, int y, int z);
+};
+
+};
+// Bump-mapping stuff
+namespace anl
+{
+    void calcBumpMap(CArray2Dd *map, CArray2Dd *bump, double light[3], double spacing, bool wrap);
+    void calcNormalMap(CArray2Dd *map, CArray2Drgba *normal, double spacing, bool normalize, bool wrap);
+
+    void multRGBAByDouble(CArray2Drgba *rgba, CArray2Dd *map);
+};
+
+
+// Rasterization
+namespace anl
+{
+	void rasterizeImplicitTriangle(int u1, int v1, CVec3f p1, int u2, int v2, CVec3f p2, int u3, int v3, CVec3f p3, CArray2Dd *a, CImplicitModuleBase *f);
+	void rasterizeRGBATriangle(int u1, int v1, CVec3f p1, int u2, int v2, CVec3f p2, int u3, int v3, CVec3f p3, CArray2Drgba *a, CRGBAModuleBase *f);
+};
