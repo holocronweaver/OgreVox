@@ -1,16 +1,22 @@
     Copyright (C) 2013  Jesse Johnson
 
-    This file is part of BareOgre.
+    This file is part of OgreVox.
 
-    BareOgre is free software: you can redistribute it and/or modify
+    OgreVox is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as 
     published by the Free Software Foundation, either version 3 of 
-    the License, or (at your option) any later version.
+    the License, or (at your option) any later version. 
 
-    BareOgre is distributed in the hope that it will be useful,
+    As an alternative, you can redistribute and/or modify this software
+    under the terms of the Mozilla Public License version 2.  
+
+    You can also choose to redistribute and/or modify this software
+    under the terms of both of the above licenses.
+
+    OgreVox is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with BareOgre.  If not, see <http://www.gnu.org/licenses/>.
+    along with OgreVox.  If not, see <http://www.gnu.org/licenses/>.
