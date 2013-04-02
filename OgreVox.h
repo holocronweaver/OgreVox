@@ -12,6 +12,8 @@
 #include "VoxelTerrain.h"
 #include "VoxelPlanet.h"
 
+#include "PolyVoxCore/SurfaceMesh.h"
+
 class OgreVox : public BareOgre
 {
  public:
@@ -32,7 +34,7 @@ class OgreVox : public BareOgre
   VoxelPlanet* mVoxelPlanet;
   Ogre::SceneNode* mVoxelPlanetNode;
 
-  Ogre::Vector3 mChunk;
+  PolyVox::Vector3DInt32* mChunk;
   static const int mViewRadius = 3;
 };
 

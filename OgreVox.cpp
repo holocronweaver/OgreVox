@@ -16,6 +16,8 @@
 
 OgreVox::OgreVox()
 {
+  //mChunk = new PolyVox::Vector3DInt32(-1,-1,-1);
+  mChunk = nullptr;
 }
 
 OgreVox::~OgreVox()
@@ -23,46 +25,81 @@ OgreVox::~OgreVox()
 }
 
 //------------------------------------------------------------------------------
-// Load PolyVox chunks within player view distance as player moves around. 
 bool OgreVox::frameRenderingQueued(const Ogre::FrameEvent& evt) {
   bool repeat_loop = BareOgre::frameRenderingQueued(evt);
 
+  // distance the camera must move before the surface
+  // is reextracted
+  float reextraction_distance = 32.0;
+
+  //std::cout << "\t frameRenderingQueued: " << repeat_loop << std::endl;
+
+  // OpenGL state machine requires all OpenGL calls to
+  // occur in main thread.  Thus Ogre::ManualObject must
+  // end() here to fill OpenGL buffers.
+  // if (mVoxelPlanet->newMesh) {
+  if (not mVoxelPlanet->surfaceRenderQueue.empty()) {
+    std::cout << "new mesh!" << std::endl;
+    mVoxelPlanet->surfaceRenderMutex.lock();
+    Ogre::ManualObject* man_obj = mVoxelPlanet->surfaceRenderQueue.front();
+    //Ogre::SceneNode* man_obj_node;
+    man_obj->end();
+    mVoxelPlanet->surfaceRenderQueue.pop();
+    //TODO destroy previous manual object
+    if(mSceneMgr->hasSceneNode(man_obj->getName()))
+    {
+      mSceneMgr->destroyManualObject(man_obj->getName());
+      //mManualObjectNode = mSceneMgr->getSceneNode(man->getName());
+    }
+    // mVoxelPlanet->convertToMesh("VoxelPlanetMesh");
+    // Ogre::Entity * voxelPlanetEntity = 
+    //   mSceneMgr->createEntity("VoxelPlanetEntity","VoxelPlanetMesh");
+    // mVoxelPlanetNode->attachObject(voxelPlanetEntity);
+    mVoxelPlanetNode->detachAllObjects();
+    mVoxelPlanetNode->attachObject(man_obj);
+    //mVoxelPlanetNode->setVisible(true);
+    mVoxelPlanet->surfaceRenderMutex.unlock();
+  }
+
+  // Load PolyVox chunks within player view distance as 
+  // player moves around. 
   Ogre::Vector3 pos = mCamNode->getPosition() - mVoxelPlanetNode->getPosition();
 
-  Ogre::Vector3 chunk(
-    (Ogre::Real) floor(pos.x / mVoxelPlanet->chunkSize),
-    (Ogre::Real) floor(pos.y / mVoxelPlanet->chunkSize),
-    (Ogre::Real) floor(pos.z / mVoxelPlanet->chunkSize)
+  // PolyVox::Vector3DInt32 chunk(
+  //   (Ogre::Real) floor(pos.x / mVoxelPlanet->chunkSize),
+  //   (Ogre::Real) floor(pos.y / mVoxelPlanet->chunkSize),
+  //   (Ogre::Real) floor(pos.z / mVoxelPlanet->chunkSize)
+  // );
+
+  PolyVox::Vector3DInt32 chunk(
+    floor(pos.x / mVoxelPlanet->chunkSize / 10),
+    floor(pos.y / mVoxelPlanet->chunkSize / 10),
+    floor(pos.z / mVoxelPlanet->chunkSize / 10)
   );
 
-  if (chunk == mChunk) { 
-    return repeat_loop;
+  if (mChunk) {
+    if (chunk == *mChunk || abs((chunk - *mChunk).length()) < reextraction_distance) { 
+      return repeat_loop;
+    }
   }
 
   std::cout << "current pos: " << pos << std::endl; 
   std::cout << "current chunk: " << chunk << std::endl; 
 
-  //Ogre::Vector3 origin(0,0,0);
-  mChunk = chunk;
-  //mVoxelPlanet->update(chunk);
-  for(int z = -mViewRadius; z <= mViewRadius; z++) {
-    for(int y = -mViewRadius; y <= mViewRadius; y++) {
-      for(int x = -mViewRadius; x <= mViewRadius; x++) {
-        // PolyVox::Vector3DInt16 current(x,y,z);
-        // double distance = (current - origin).length();
-        // if(distance <= mViewRadius) {
-        //   pageRegionMesh(Ogre::Vector3(pos.x + x,pos.y + y, pos.z + z));
-        Ogre::ManualObject manobj = mVoxelPlanet->update(
-          PolyVox::Vector3DInt32(pos.x + x,
-                                 pos.y + y, 
-                                 pos.z + z));
-        // Add manual object to scene.
-        mSceneMgr->getRootSceneNode()->createChildSceneNode("VoxelPlanetNode"+);
-        
-        // }
-      }
-    }
+  // size of the cube whose surface is extracted
+  //PolyVox::Vector3DInt32 view_distance(65,65,65);
+  PolyVox::Vector3DInt32 view_distance(128,128,128);
+  
+  PolyVox::Region region(chunk - view_distance,
+                         chunk + view_distance);
+
+  mVoxelPlanet->enqueueSurfaceExtraction(region);
+
+  if (not mChunk) {
+    mChunk = new PolyVox::Vector3DInt32();
   }
+  
+  *mChunk = chunk;
 
   return repeat_loop;
 }
@@ -90,7 +127,7 @@ void OgreVox::createScene()
     Ogre::Real(vp->getActualWidth() / Ogre::Real(vp->getActualHeight())));
 
   // Add lighting.
-  //mSceneMgr->setAmbientLight(Ogre::ColourValue(0.5,0.5,0.5));
+  mSceneMgr->setAmbientLight(Ogre::ColourValue(0.5,0.5,0.5));
 
   Ogre::Light* l = mSceneMgr->createLight("MainLight");
   l->setType(Ogre::Light::LT_DIRECTIONAL);
@@ -109,20 +146,20 @@ void OgreVox::createScene()
   mDirection = Ogre::Vector3::ZERO;
 
   // Add voxels.
-  mVoxelSphere = new VoxelSphere("VoxelSphere");
-  mVoxelSphere->generate(40);
-  mVoxelSphereNode = 
-    mSceneMgr->getRootSceneNode()->createChildSceneNode("VoxelSphereNode");
-  mVoxelSphereNode->setPosition(200,200,200);
-  mVoxelSphereNode->attachObject(mVoxelSphere);
+  // mVoxelSphere = new VoxelSphere("VoxelSphere");
+  // mVoxelSphere->generate(40);
+  // mVoxelSphereNode = 
+  //   mSceneMgr->getRootSceneNode()->createChildSceneNode("VoxelSphereNode");
+  // mVoxelSphereNode->setPosition(200,200,200);
+  // mVoxelSphereNode->attachObject(mVoxelSphere);
 
-  mLargeVoxelSphere = new LargeVoxelSphere("LargeVoxelSphere");
-  mLargeVoxelSphere->generate(200);
-  mLargeVoxelSphereNode = 
-    mSceneMgr->getRootSceneNode()->createChildSceneNode("LargeVoxelSphereNode");
-  mLargeVoxelSphereNode->setPosition(-2000,-2000,-2000);
-  mLargeVoxelSphereNode->scale(5,5,5);
-  mLargeVoxelSphereNode->attachObject(mLargeVoxelSphere);
+  // mLargeVoxelSphere = new LargeVoxelSphere("LargeVoxelSphere");
+  // mLargeVoxelSphere->generate(200);
+  // mLargeVoxelSphereNode = 
+  //   mSceneMgr->getRootSceneNode()->createChildSceneNode("LargeVoxelSphereNode");
+  // mLargeVoxelSphereNode->setPosition(-2000,-2000,-2000);
+  // mLargeVoxelSphereNode->scale(5,5,5);
+  // mLargeVoxelSphereNode->attachObject(mLargeVoxelSphere);
 
   // mVoxelTerrain = new VoxelTerrain("VoxelTerrain");
   // mVoxelTerrain->generate(200);
@@ -136,11 +173,14 @@ void OgreVox::createScene()
 
   mVoxelPlanet = new VoxelPlanet("VoxelPlanet");
   mVoxelPlanet->generate(200, Ogre::Vector3(0,0,0));
+  
   mVoxelPlanetNode = 
-    mSceneMgr->getRootSceneNode()->createChildSceneNode("VoxelPlanetNode");
-  mVoxelPlanetNode->setPosition(250,-1000,-3000);
-  mVoxelPlanetNode->scale(50, 50, 50);
-  mVoxelPlanetNode->attachObject(mVoxelPlanet);
+    mSceneMgr->getRootSceneNode()->createChildSceneNode("VoxelPlanet");
+  //mVoxelPlanetNode->setPosition(250,-1000,-3000);
+  mVoxelPlanetNode->setPosition(250,-1000,-10000);
+  //mVoxelPlanetNode->scale(50, 50, 50);
+  mVoxelPlanetNode->scale(150, 150, 150);
+
 }
 
 //==============================================================================
@@ -175,6 +215,8 @@ extern "C" {
         e.getFullDescription().c_str() << std::endl;
 #endif
     }
+
+    std::cout << "All done!  Exiting normally." << std::endl;
 
     return 0;
   }

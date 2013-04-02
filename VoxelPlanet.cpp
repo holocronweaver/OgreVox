@@ -13,17 +13,20 @@ anl::CMWC4096 rnd3;
 
 anl::CImplicitFractal p_lowland_fractal(anl::FBM, anl::GRADIENT, anl::QUINTIC);
 anl::CImplicitAutoCorrect p_lowland_autocorrect(0.7, 1);
-anl::CImplicitScaleOffset p_lowland_scale(40, 1);
+//anl::CImplicitScaleOffset p_lowland_scale(40, 1);
+anl::CImplicitScaleOffset p_lowland_scale(150, 1);
 anl::CImplicitNormalizeCoords p_lowland_normalize(1);
 
 anl::CImplicitFractal p_highland_fractal(anl::RIDGEDMULTI, anl::GRADIENT, anl::QUINTIC);
 anl::CImplicitAutoCorrect p_highland_autocorrect(0.8, 1);
-anl::CImplicitScaleOffset p_highland_scale(45, 1);
+//anl::CImplicitScaleOffset p_highland_scale(45, 1);
+anl::CImplicitScaleOffset p_highland_scale(200, 1);
 anl::CImplicitNormalizeCoords p_highland_normalize(1);
 
 anl::CImplicitFractal p_mountains_fractal(anl::BILLOW, anl::GRADIENT, anl::QUINTIC);
 anl::CImplicitAutoCorrect p_mountains_autocorrect(0.4, 1);
-anl::CImplicitScaleOffset p_mountains_scale(50, 1);
+//anl::CImplicitScaleOffset p_mountains_scale(50, 1);
+anl::CImplicitScaleOffset p_mountains_scale(220, 1);
 anl::CImplicitNormalizeCoords p_mountains_normalize(1);
 
 anl::CImplicitFractal p_terrain_type_fractal(anl::FBM, anl::GRADIENT, anl::QUINTIC);
@@ -52,14 +55,20 @@ anl::CImplicitCombiner p_surface_cave_multiply(anl::MULT);
 
 anl::CImplicitSphere p_sphere_gradient;
 
-VoxelPlanet::VoxelPlanet(const Ogre::String& name):
-  Ogre::ManualObject(name)
+VoxelPlanet::VoxelPlanet(const Ogre::String& name)//:
+  //Ogre::ManualObject(name)
 {
-
+  // newMesh = false;
+  shutdownThreads = false;
+  // setDynamic(false);
 }
 
 VoxelPlanet::~VoxelPlanet()
 {
+  shutdownThreads = true;
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
 
 void VoxelPlanet::generateNoise()
@@ -206,54 +215,106 @@ void VoxelPlanet::storeVolume(
   std::cout << "Deleting VoxelPlanet volume." << std::endl;
 }
 
-void VoxelPlanet::update(PolyVox::Vector3DInt32 chunk)
-{
-  chunk *= 32;
-  PolyVox::Region region(chunk,
-                         chunk + PolyVox::Vector3DInt32(32,32,32));
+// void VoxelPlanet::update(PolyVox::Vector3DInt32 chunk)
+// {
+//   chunk *= 32;
+//   PolyVox::Region region(chunk,
+//                          chunk + PolyVox::Vector3DInt32(32,32,32));
 
-  // update ManualObject or generate new one
+//   // update ManualObject or generate new one
 
-  //Ogre::ManualObject manual;
-}
+//   //Ogre::ManualObject manual;
+// }
 
 void VoxelPlanet::generate(float radius, Ogre::Vector3 origin)
 {
   //FIXME do something with the radius and origin!
-  mVolOrigin = origin;
-  mRadius = radius;
+  volumeOrigin = origin;
+  radius = radius;
 
   generateNoise();
 
-  mVolumeData = new PolyVox::LargeVolume<BYTE>(
+  volumeData = new PolyVox::LargeVolume<BYTE>(
     &VoxelPlanet::requestVolume,
     &VoxelPlanet::storeVolume);
-  mVolumeData->setMaxNumberOfBlocksInMemory(2048);
-  mVolumeData->setMaxNumberOfUncompressedBlocks(2048);
+  volumeData->setMaxNumberOfBlocksInMemory(8192);
+  volumeData->setMaxNumberOfUncompressedBlocks(8192);
 
-  mesh();
+  // PolyVox::Region region(PolyVox::Vector3DInt32(-65,-65,-65),
+  //                        PolyVox::Vector3DInt32(65,65,65));
+  // extractSurface(region);
+
+  threads.push_back(
+    std::thread(&VoxelPlanet::extractSurface, this)
+  );
 }
 
-void VoxelPlanet::mesh()
+// producer
+void VoxelPlanet::enqueueSurfaceExtraction(PolyVox::Region region) 
 {
+  surfaceExtractionQueue.push(region);
+
+  // wake consumer
+  extractionQueueNotEmpty.notify_one();
+}
+
+// consumer
+void VoxelPlanet::extractSurface()
+{
+  while (not shutdownThreads) {
+    std::unique_lock<std::mutex> s(surfaceExtractionQueueMutex);
+    while (not surfaceExtractionQueue.empty()) {
+      //std::lock_guard<std::recursive_mutex> guard(mutex);
+      surfaceExtractionMutex.lock();
+      PolyVox::Region region = surfaceExtractionQueue.front();
+      Ogre::ManualObject * man_obj = new Ogre::ManualObject("VoxelPlanet");
+      _extractSurface(region, man_obj);
+      surfaceExtractionQueue.pop();
+      surfaceRenderQueue.push(man_obj);
+      surfaceExtractionMutex.unlock();
+    }                                         
+    // sleep until woken by producer
+    extractionQueueNotEmpty.wait(
+      s, 
+      [this](){
+        return not surfaceExtractionQueue.empty(); 
+      }
+    );
+  }  
+}
+
+// Surface extraction occurs on a cubic region whose center follows
+// the camera's position.  As the camera moves, so too does
+// the cube.  Once the camera has moved a certain distance,
+// the surface of the relocated cube is extracted.
+// So long as the cube is sufficiently large and the surface extraction
+// occurs often enough (i.e., the re-extraction distance is small),
+// the player should never see popping or a clipped voxel surface.
+void VoxelPlanet::_extractSurface(
+  PolyVox::Region region, 
+  Ogre::ManualObject* man_obj
+)
+{
+  //std::cout << "\t _extractSurface" << std::endl;
+
   PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> mesh;
 
-  PolyVox::Region region(PolyVox::Vector3DInt32(-65,-65,-65),
-                        PolyVox::Vector3DInt32(65,65,65));
-
-  // PolyVox::Region region(PolyVox::Vector3DInt32(sector*,-65,-65),
-  //                        PolyVox::Vector3DInt32(65,65,65));
-
-  std::cout << "Begin extracting surface." << std::endl;
+  if (DEBUG) { std::cout << "Begin extracting surface." << std::endl; }
   PolyVox::MarchingCubesSurfaceExtractor<PolyVox::LargeVolume<BYTE> >
     //PolyVox::CubicSurfaceExtractorWithNormals<PolyVox::LargeVolume<BYTE> >
-    surface_extractor(mVolumeData,
+    surface_extractor(volumeData,
                       region,
                       &mesh);
   surface_extractor.execute();
-  std::cout << "Done extracting surface." << std::endl;
+  if (DEBUG) { std::cout << "Done extracting surface." << std::endl; }
 
-  begin("SimpleTexture", Ogre::RenderOperation::OT_TRIANGLE_LIST);
+  man_obj->setDynamic(false);
+  man_obj->clear();
+  if (DEBUG) { std::cout << "Begin building manual object." << std::endl; }
+  man_obj->begin("SimpleTexture", 
+                          Ogre::RenderOperation::OT_TRIANGLE_LIST);
+  //man_obj->begin("BareWhite", 
+  //               Ogre::RenderOperation::OT_TRIANGLE_LIST);
   {
     const std::vector<PolyVox::PositionMaterialNormal>& vecVertices =
       mesh.getVertices();
@@ -262,7 +323,7 @@ void VoxelPlanet::mesh()
     int beginIndex = mesh.m_vecLodRecords[uLodLevel].beginIndex;
     int endIndex = mesh.m_vecLodRecords[uLodLevel].endIndex;
 
-    for(int index = beginIndex; index < endIndex; ++index) {
+    for (int index = beginIndex; index < endIndex; ++index) {
       const PolyVox::PositionMaterialNormal& vertex =
         vecVertices[vecIndices[index]];
       const PolyVox::Vector3DFloat& v3dVertexPos = vertex.getPosition();
@@ -270,20 +331,22 @@ void VoxelPlanet::mesh()
 
       const PolyVox::Vector3DFloat v3dFinalVertexPos = v3dVertexPos +
         static_cast<PolyVox::Vector3DFloat>(mesh.m_Region.getLowerCorner());
-      position(v3dFinalVertexPos.getX(),
-               v3dFinalVertexPos.getY(),
-               v3dFinalVertexPos.getZ());
-      normal(v3dVertexNormal.getX(),
-             v3dVertexNormal.getY(),
-             v3dVertexNormal.getZ());
-      colour(1, 0, 0, 0.5);
+      man_obj->position(v3dFinalVertexPos.getX(),
+                        v3dFinalVertexPos.getY(),
+                        v3dFinalVertexPos.getZ());
+      man_obj->normal(v3dVertexNormal.getX(),
+                      v3dVertexNormal.getY(),
+                      v3dVertexNormal.getZ());
+      man_obj->colour(1, 0, 0, 0.5);
       // Repeat mesh every 4 units.
-      textureCoord(v3dFinalVertexPos.getX()/4.0f,
-                   v3dFinalVertexPos.getY()/4.0f,
-                   v3dFinalVertexPos.getZ()/4.0f);
+      man_obj->textureCoord(v3dFinalVertexPos.getX()/4.0f,
+                            v3dFinalVertexPos.getY()/4.0f,
+                            v3dFinalVertexPos.getZ()/4.0f);
     }
   }
-  end();
+  if (DEBUG) { std::cout << "Done building manual object." << std::endl; }
+  //end();
+  //newMesh = true;
 }
 
 // Ogre::ManualObject* VoxelPlanet::fillManualObject()
@@ -292,10 +355,14 @@ void VoxelPlanet::mesh()
 
 float VoxelPlanet::getRadius()
 {
-  return mRadius;
+  return radius;
 }
 
 Ogre::Vector3 VoxelPlanet::getOrigin()
 {
-  return mVolOrigin;
+  return volumeOrigin;
 }
+
+// void VoxelPlanet::swapManualObjects() {
+//   this = tempManualObject;
+//} 

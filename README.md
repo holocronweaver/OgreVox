@@ -25,7 +25,7 @@ project and system.
 3. Use `cmake .` in the root project folder to produce the appropriate 
 compilation or project files for your system.
 5. Compile the code using the files produced by CMake.
-6. Either run the exectable or the Python script `run.py` in dist/bin
+6. Either run the executable or the Python script `run.py` in dist/bin
 to start the program.
 7. ...
 8. Profit.

@@ -119,7 +119,6 @@ set(HDRS
   ./LargeVoxelSphere.h
   ./VoxelTerrain.h
   ./VoxelPlanet.h
-  ./Noise.h
   ${PROJECT_NAME}.h
 )
 
@@ -129,7 +128,6 @@ set(SRCS
   ./LargeVoxelSphere.cpp
   ./VoxelTerrain.cpp
   ./VoxelPlanet.cpp
-  ./Noise.cpp
   ${PROJECT_NAME}.cpp
 )
 
