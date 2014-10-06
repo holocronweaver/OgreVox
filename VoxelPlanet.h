@@ -19,12 +19,15 @@
 
 #include "PolyVoxCore/CubicSurfaceExtractorWithNormals.h"
 #include "PolyVoxCore/CubicSurfaceExtractor.h"
-#include "PolyVoxCore/MarchingCubesSurfaceExtractor.h"
-#include "PolyVoxCore/SurfaceMesh.h"
 #include "PolyVoxCore/LargeVolume.h"
+#include "PolyVoxCore/MarchingCubesSurfaceExtractor.h"
+#include "PolyVoxCore/Raycast.h"
+#include "PolyVoxCore/SurfaceMesh.h"
 
 // Accidental Noise Library
 #include "anl.h" 
+
+#include "Raycast.h"
 
 typedef uint8_t BYTE;
 
@@ -50,9 +53,10 @@ class VoxelPlanet //: public Ogre::ManualObject
   std::mutex surfaceRenderMutex;
   std::queue<PolyVox::Region> surfaceExtractionQueue;
   std::queue<Ogre::ManualObject*> surfaceRenderQueue;
-  // bool newMesh;
 
-
+  Raycast raycast(
+    Ogre::Vector3 position, Ogre::Vector3 direction, float distance);
+  
  protected:
   PolyVox::LargeVolume<BYTE>* volumeData;
   Ogre::Vector3 volumeOrigin;
@@ -64,14 +68,15 @@ class VoxelPlanet //: public Ogre::ManualObject
                    const PolyVox::Region& region);
   static void generateNoise();
 
+
  private:
   std::condition_variable extractionQueueNotEmpty;
   bool shutdownThreads;
   void _extractSurface(PolyVox::Region region, Ogre::ManualObject* man_obj);
 
-  //Ogre::ManualObject* tempManualObject;
-
-  static const bool DEBUG = false;
+  static const bool DEBUG = true;
 };
+
+
 
 #endif // #ifndef __VoxelPlanet_h_

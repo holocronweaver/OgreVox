@@ -1,8 +1,7 @@
 vertex_program TerrainVertex glsl
 {
-    source TerrainVertex.vert 
-    entry_point main
-    syntax arbvp1
+    source TerrainVS.glsl
+    syntax glsl150
     
     default_params
     {
@@ -13,22 +12,22 @@ vertex_program TerrainVertex glsl
 
 fragment_program TerrainFragment glsl
 {
-    source TerrainFragment.frag 
-    entry_point main
-    syntax arbfp1
+    source TerrainFS.glsl
+    syntax glsl150
     
     default_params
     {
+      // param_named p_diffuse int 0
       param_named_auto p_lightPos light_position 0
     }
 }
 
-material SimpleTexture
+material Terrain
 {
   technique
   {
     pass
-    {  
+    {
       
       vertex_program_ref TerrainVertex
       {
@@ -36,7 +35,6 @@ material SimpleTexture
       
       fragment_program_ref TerrainFragment
       {
-          param_named p_diffuse int 0
       }
       
       texture_unit

@@ -1,0 +1,3 @@
+[submodule "BareOgre"]
+	path = BareOgre
+	url = git@github.com:holocronweaver/BareOgre.git

@@ -16,26 +16,32 @@
 
 class OgreVox : public BareOgre
 {
- public:
-  OgreVox(void);
-  virtual ~OgreVox(void);
+public:
+    OgreVox(void);
+    virtual ~OgreVox(void);
 
- protected:
-  virtual void createScene(void);
-  bool frameRenderingQueued(const Ogre::FrameEvent& evt);
+protected:
+    virtual void createScene(void);
+    bool frameRenderingQueued(const Ogre::FrameEvent& evt);
 
- private:
-  VoxelSphere* mVoxelSphere;
-  Ogre::SceneNode* mVoxelSphereNode;
-  LargeVoxelSphere* mLargeVoxelSphere;
-  Ogre::SceneNode* mLargeVoxelSphereNode;
-  VoxelTerrain* mVoxelTerrain;
-  Ogre::SceneNode* mVoxelTerrainNode;
-  VoxelPlanet* mVoxelPlanet;
-  Ogre::SceneNode* mVoxelPlanetNode;
+    void mouseMoved(const SDL_MouseMotionEvent& event);
+    void mousePressed(const SDL_MouseButtonEvent& event);
+    void mouseReleased(const SDL_MouseButtonEvent& event);
 
-  PolyVox::Vector3DInt32* mChunk;
-  static const int mViewRadius = 3;
+private:
+    VoxelSphere* mVoxelSphere;
+    Ogre::SceneNode* mVoxelSphereNode;
+    LargeVoxelSphere* mLargeVoxelSphere;
+    Ogre::SceneNode* mLargeVoxelSphereNode;
+    VoxelTerrain* mVoxelTerrain;
+    Ogre::SceneNode* mVoxelTerrainNode;
+    VoxelPlanet* mVoxelPlanet;
+    Ogre::SceneNode* mVoxelPlanetNode;
+
+    Ogre::SceneNode* mMarkerNode;
+
+    PolyVox::Vector3DInt32* mChunk;
+    static const int mViewRadius = 3;
 };
 
 #endif // #ifndef __OgreVox_h_
