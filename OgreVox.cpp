@@ -141,9 +141,9 @@ void OgreVox::createScene()
 
     // Set player control parameters.
     mRotationSpeed = 0.13;
-    mMaxSpeed = 2000;
+    mMaxSpeed = 20000;
     mSlowMaxSpeed = mMaxSpeed / 15;
-    mAccelerationRate = 100;
+    mAccelerationRate = 200;
     // mDirection = Ogre::Vector3::ZERO;
 
     // Add voxels.
@@ -199,15 +199,16 @@ void OgreVox::mouseMoved(const SDL_MouseMotionEvent& event)
 {
     BareOgre::mouseMoved(event);
 
-    mCamNode->yaw(Ogre::Degree(-mRotationSpeed * event.xrel),
-                  Ogre::Node::TS_WORLD);
-    mCamNode->pitch(Ogre::Degree(-mRotationSpeed * event.yrel),
-                    Ogre::Node::TS_LOCAL);
+    // const float rate = 0.001;
+    // mCamNode->yaw(Ogre::Radian( * event.xrel),
+    //               Ogre::Node::TS_WORLD);
+    // mCamNode->pitch(Ogre::Degree(-mRotationSpeed * event.yrel),
+    //                 Ogre::Node::TS_LOCAL);
     //}
 
     // Raycast to find the voxel we are looking at.
-    Ogre::Vector3 origin = mCamNode->getPosition() - mVoxelPlanetNode->getPosition();
-    Ogre::Vector3 direction = mCamNode->getOrientation() * Ogre::Vector3(0, 0, -1);
+    // Ogre::Vector3 origin = mCamNode->getPosition() - mVoxelPlanetNode->getPosition();
+    // Ogre::Vector3 direction = mCamNode->getOrientation() * Ogre::Vector3(0, 0, -1);
     // std::cout << origin << std::endl;
     // Raycast raycast = mVoxelPlanet->raycast(origin, direction, 10.0);
 
