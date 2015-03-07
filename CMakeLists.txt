@@ -14,7 +14,7 @@ if(WIN32)
   set(OGRE_SAMPLES_INCLUDEPATH "$ENV{OGRE_HOME}/Samples/include")
 endif(WIN32)
 
-if(UNIX)
+if (UNIX)
   set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11")
   if (EXISTS "/usr/local/lib/OGRE/cmake")
     set(CMAKE_MODULE_PATH "/usr/local/lib/OGRE/cmake/;${CMAKE_MODULE_PATH}")
@@ -97,6 +97,7 @@ target_link_libraries(
   # ${CEGUI_OgreRenderer_LIBRARIES}
   ${PolyVox_LIBRARIES}
   AccidentalNoise
+  pthread
   )
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dist/bin)

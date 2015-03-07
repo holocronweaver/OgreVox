@@ -12,8 +12,6 @@
 #include "VoxelTerrain.h"
 #include "VoxelPlanet.h"
 
-#include "PolyVoxCore/SurfaceMesh.h"
-
 class OgreVox : public BareOgre
 {
 public:
@@ -24,24 +22,20 @@ protected:
     virtual void createScene(void);
     bool frameRenderingQueued(const Ogre::FrameEvent& evt);
 
-    void mouseMoved(const SDL_MouseMotionEvent& event);
-    void mousePressed(const SDL_MouseButtonEvent& event);
-    void mouseReleased(const SDL_MouseButtonEvent& event);
+    // void mouseMoved(const SDL_MouseMotionEvent& event);
+    // void mousePressed(const SDL_MouseButtonEvent& event);
+    // void mouseReleased(const SDL_MouseButtonEvent& event);
 
 private:
     VoxelSphere* mVoxelSphere;
     Ogre::SceneNode* mVoxelSphereNode;
     LargeVoxelSphere* mLargeVoxelSphere;
     Ogre::SceneNode* mLargeVoxelSphereNode;
-    VoxelTerrain* mVoxelTerrain;
-    Ogre::SceneNode* mVoxelTerrainNode;
+    // VoxelTerrain* mVoxelTerrain;
+    // Ogre::SceneNode* mVoxelTerrainNode;
     VoxelPlanet* mVoxelPlanet;
-    Ogre::SceneNode* mVoxelPlanetNode;
 
     Ogre::SceneNode* mMarkerNode;
-
-    PolyVox::Vector3DInt32* mChunk;
-    static const int mViewRadius = 3;
 };
 
 #endif // #ifndef __OgreVox_h_
