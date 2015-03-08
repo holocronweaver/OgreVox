@@ -4,26 +4,25 @@
 // Copyrighted under the MPLv2 and LGPLv3 by Jesse Johnson.
 #include "LargeVoxelSphere.h"
 
+#include <cstdlib>
 #include <vector>
 
-#include <stdlib.h>
-
-//PolyVox::Vector3DFloat mVolCenter;
-
-//int mRadius;
+#include "PolyVox/Mesh.h"
 
 LargeVoxelSphere::LargeVoxelSphere(const Ogre::String& name):
   Ogre::ManualObject(name)
 {
 }
 
+
 LargeVoxelSphere::~LargeVoxelSphere()
 {
 }
 
-void LargeVoxelSphere::requestVolume(
-  const PolyVox::ConstVolumeProxy<BYTE>& volume,
-  const PolyVox::Region& region)
+
+void LargeVoxelSphere::VoxelSpherePager::pageIn(
+    const PolyVox::Region& region,
+    PolyVox::PagedVolume<BYTE>::Chunk* chunk)
 {
  for (int z = region.getLowerCorner().getZ();
       z <= region.getUpperCorner().getZ(); z++) {
@@ -40,15 +39,16 @@ void LargeVoxelSphere::requestVolume(
           voxel_value = 255;
         }
 
-        volume.setVoxelAt(x, y, z, voxel_value);
+        chunk->setVoxel(x, y, z, voxel_value);
       }
     }
   }
 }
 
-void LargeVoxelSphere::storeVolume(
-  const PolyVox::ConstVolumeProxy<BYTE>& volume,
-  const PolyVox::Region& region)
+
+void LargeVoxelSphere::VoxelSpherePager::pageOut(
+    const PolyVox::Region& region,
+    PolyVox::PagedVolume<BYTE>::Chunk* chunk)
 {
   // Ignore data which can no longer fit into memory.
   //TODO Create save data for modified voxels.
@@ -57,21 +57,7 @@ void LargeVoxelSphere::storeVolume(
 
 void LargeVoxelSphere::generate(float radius)
 {
-  //float buffer = 4*radius;
-  //mVolumeData = new PolyVox::LargeVolume<BYTE>(region);
-
-  mVolumeData = new PolyVox::LargeVolume<BYTE>(
-    &LargeVoxelSphere::requestVolume,
-    &LargeVoxelSphere::storeVolume);
-  // PolyVox::Region region(PolyVox::Vector3DInt32(-40,-40,-40),
-  //                        PolyVox::Vector3DInt32(40, 40, 40));
-  // mVolumeData->prefetch(region);
-
-  // mVolCenter(mVolumeData.getWidth() / 2,
-  //            mVolumeData.getHeight() / 2,
-  //            mVolumeData.getDepth() / 2);
-  //mVolCenter(buffer/2, buffer/2, buffer/2);
-  //PolyVox::Vector3DFloat volCenter(buffer/2, buffer/2, buffer/2);
+  mVolumeData = new PolyVox::LargeVolume<BYTE>(new VoxelSpherePager);
 
   //mRadius = radius;
 
@@ -80,50 +66,35 @@ void LargeVoxelSphere::generate(float radius)
 
 void LargeVoxelSphere::mesh()
 {
-  PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> mesh;
+    PolyVox::Region region(PolyVox::Vector3DInt32(-120,-120,-120),
+                           PolyVox::Vector3DInt32(120, 120, 120));
 
-  PolyVox::Region testy = mVolumeData->getEnclosingRegion();
+    auto encodedMesh = extractCubicMesh(mVolumeData, region);
+    auto mesh = decodeMesh(encodedMesh);
+    auto vertexOffset = static_cast<PolyVox::Vector3DFloat>(mesh.getOffset());
+  
+    delete mVolumeData;
+    mVolumeData = nullptr;
 
-  PolyVox::Region region(PolyVox::Vector3DInt32(-120,-120,-120),
-                         PolyVox::Vector3DInt32(120, 120, 120));
+    // clear();
+    begin("BaseWhite", Ogre::RenderOperation::OT_TRIANGLE_LIST);
+    {
+        auto& vertices = mesh.getVertices();
+        auto& indices = mesh.getIndices();
 
-  PolyVox::MarchingCubesSurfaceExtractor<PolyVox::LargeVolume<BYTE> >
-    surface_extractor(mVolumeData,
-                      region,
-                      &mesh);
-  surface_extractor.execute();
-
-  delete mVolumeData;
-  mVolumeData = nullptr;
-
-  //clear();
-  begin("BaseWhite", Ogre::RenderOperation::OT_TRIANGLE_LIST);
-  {
-    const std::vector<PolyVox::PositionMaterialNormal>& vecVertices =
-      mesh.getVertices();
-    const std::vector<uint32_t>& vecIndices = mesh.getIndices();
-    unsigned int uLodLevel = 0;
-    int beginIndex = mesh.m_vecLodRecords[uLodLevel].beginIndex;
-    int endIndex = mesh.m_vecLodRecords[uLodLevel].endIndex;
-
-    for(int index = beginIndex; index < endIndex; ++index) {
-      const PolyVox::PositionMaterialNormal& vertex =
-        vecVertices[vecIndices[index]];
-      const PolyVox::Vector3DFloat& v3dVertexPos = vertex.getPosition();
-      const PolyVox::Vector3DFloat& v3dVertexNormal = vertex.getNormal();
-      //const Vector3DFloat v3dRegionOffset(uRegionX * g_uRegionSideLength, uRegionY * g_uRegionSideLength, uRegionZ * g_uRegionSideLength);
-      const PolyVox::Vector3DFloat v3dFinalVertexPos =
-        v3dVertexPos +
-        static_cast<PolyVox::Vector3DFloat>(mesh.m_Region.getLowerCorner());
-      position(v3dFinalVertexPos.getX(), v3dFinalVertexPos.getY(), v3dFinalVertexPos.getZ());
-      normal(v3dVertexNormal.getX(), v3dVertexNormal.getY(), v3dVertexNormal.getZ());
-      // uint8_t mat = vertex.getMaterial() + 0.5;
-      // uint8_t red = mat & 0xF0;
-      // uint8_t green = mat & 0x03;
-      // uint8_t blue = mat & 0x0C;
-      // colour(red*2, green*4, blue*4);
-      colour(1, 0, 0, 0.5);
+        for (auto index : indices) {
+            auto& vertex = vertices[index];
+            auto vertexPos = vertex.position + vertexOffset;
+        
+            position(vertexPos.getX(), vertexPos.getY(), vertexPos.getZ());
+      
+            // uint8_t mat = vertex.getMaterial() + 0.5;
+            // uint8_t red = mat & 0xF0;
+            // uint8_t green = mat & 0x03;
+            // uint8_t blue = mat & 0x0C;
+            // colour(red*2, green*4, blue*4);
+            colour(1, 0, 0, 0.5);
+        }
     }
-  }
-  end();
+    end();
 }

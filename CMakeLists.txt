@@ -7,7 +7,7 @@ project(${APPLICATION_NAME})
 add_subdirectory(BareOgre)
 add_subdirectory(lib)
 
-if(WIN32)
+if (WIN32)
   # set(OGRE_STATIC TRUE)
   set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11")
   set(CMAKE_MODULE_PATH "$ENV{OGRE_HOME}/CMake/;${CMAKE_MODULE_PATH}")
@@ -60,14 +60,14 @@ endif ()
 #   message(SEND_ERROR "Failed to find CEGUI_OGRE.")
 # endif ()
 
-find_package(PolyVox REQUIRED)
+# find_package(PolyVox REQUIRED)
 
-if(NOT PolyVox_FOUND)
-  message(SEND_ERROR "Failed to find PolyVox.")
-endif()
+# if(NOT PolyVox_FOUND)
+#   message(SEND_ERROR "Failed to find PolyVox.")
+# endif()
 
 file(GLOB HDRS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
-file(GLOB HDRS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+file(GLOB SRCS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/BareOgre
@@ -77,12 +77,13 @@ include_directories(
   # ${CEGUI_INCLUDE_DIRS}
   # ${CEGUI_OGRE_INCLUDE_DIRS}
   # ${CEGUI_OgreRenderer_INCLUDE_DIRS}
-  ${PolyVox_INCLUDE_DIRS}
+  # ${PolyVox_INCLUDE_DIRS}
+  "${PROJECT_SOURCE_DIR}/lib/polyvox/include"
   "${PROJECT_SOURCE_DIR}/lib/accidentalnoise/include"
   #${AccidentalNoise_INCLUDE_DIRS}
   )
 
-add_executable(${PROJECT_NAME} WIN32 ${HDRS} ${SRCS})
+add_executable(${PROJECT_NAME} WIN32 ${HDRS} ${SRCS} ${PolyVox_HDRS} ${PolyVox_SRCS})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX _d)
 
@@ -95,8 +96,9 @@ target_link_libraries(
   # ${CEGUI_LIBRARIES}
   # ${CEGUI_OGRE_LIBRARIES}
   # ${CEGUI_OgreRenderer_LIBRARIES}
-  ${PolyVox_LIBRARIES}
+  # ${PolyVox_LIBRARIES}
   AccidentalNoise
+  # PolyVox
   pthread
   )
 

@@ -8,11 +8,10 @@
 
 #include "OgreManualObject.h"
 
-#include "PolyVoxCore/CubicSurfaceExtractorWithNormals.h"
-#include "PolyVoxCore/CubicSurfaceExtractor.h"
-#include "PolyVoxCore/MarchingCubesSurfaceExtractor.h"
-#include "PolyVoxCore/SurfaceMesh.h"
-#include "PolyVoxCore/LargeVolume.h"
+#include "PolyVox/CubicSurfaceExtractor.h"
+#include "PolyVox/MarchingCubesSurfaceExtractor.h"
+#include "PolyVox/Mesh.h"
+#include "PolyVox/LargeVolume.h"
 
 // Accidental Noise Library
 #include "anl.h" 

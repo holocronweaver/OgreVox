@@ -19,17 +19,13 @@
 #include "OgreSceneManager.h"
 #include "OgreSceneNode.h"
 
-#include "PolyVoxCore/CubicSurfaceExtractorWithNormals.h"
-#include "PolyVoxCore/CubicSurfaceExtractor.h"
-#include "PolyVoxCore/LargeVolume.h"
-#include "PolyVoxCore/MarchingCubesSurfaceExtractor.h"
-#include "PolyVoxCore/Raycast.h"
-#include "PolyVoxCore/SurfaceMesh.h"
+#include "PolyVox/CubicSurfaceExtractor.h"
+#include "PolyVox/PagedVolume.h"
+#include "PolyVox/Raycast.h"
+#include "PolyVox/Mesh.h"
 
 // Accidental Noise Library
 #include "anl.h" 
-
-#include "Raycast.h"
 
 typedef uint8_t BYTE;
 
@@ -40,7 +36,9 @@ class VoxelPlanet
                 Ogre::SceneManager* sceneMgr);
     virtual ~VoxelPlanet();
 
+    // 
     virtual void generate(float radius, Ogre::Vector3 origin);
+    
     virtual void enqueueSurfaceExtraction(PolyVox::Region region);
     
     /**
@@ -52,18 +50,14 @@ class VoxelPlanet
      * occurs often enough (i.e., the re-extraction distance is small),
      * the player should never see popping or a clipped voxel surface.
      **/
-    virtual void extractSurface();//PolyVox::Region region);
-    //virtual void update(PolyVox::Vector3DInt32 chunk);
+    virtual void extractSurface();
 
     virtual Ogre::Vector3 getOrigin() { mVolumeOrigin; }
     virtual float getRadius() { mRadius; }
 
     // Render the next queued region and enqueue a new region if the camera
-    // has moved far enough from the voxel of its previous positions.
+    // has moved far enough from the last queued region.
     void update(Ogre::SceneManager* sceneMgr);
-
-    Raycast raycast(
-        Ogre::Vector3 position, Ogre::Vector3 direction, float distance);
 
     Ogre::SceneNode* getSceneNode() { return mSceneNode; }
     
@@ -72,11 +66,14 @@ class VoxelPlanet
     Ogre::Vector3 mVolumeOrigin;
     float mRadius;
 
-    static void requestVolume(const PolyVox::ConstVolumeProxy<BYTE>& volume,
-                              const PolyVox::Region& region);
-    static void storeVolume(const PolyVox::ConstVolumeProxy<BYTE>& volume,
-                            const PolyVox::Region& region);
-    static void generateNoise();
+    class VoxelPlanetPager : public PolyVox::PagedVolume<BYTE>::Pager
+    {
+        void pageIn(const PolyVox::Region& region, PolyVox::PagedVolume<BYTE>::Chunk* chunk);
+        void pageOut(const PolyVox::Region& region, PolyVox::PagedVolume<BYTE>::Chunk* chunk);
+    };
+
+    // Create and configure the noise function chain.
+    static void setupNoise();
 
     // Get the chunk the camera currently occupies.
     PolyVox::Vector3DInt32 getCurrentChunk();
@@ -85,7 +82,7 @@ class VoxelPlanet
     // the render queue.
     void render(Ogre::SceneManager* sceneMgr);
 
-    // If the camera has moved far enough from the voxel it occupied
+    // If the camera has moved far enough from the chunk it occupied
     // during the previous surface extraction, enqueue a new region to
     // be extracted.
     void page();
@@ -106,8 +103,8 @@ class VoxelPlanet
     Ogre::SceneNode* mSceneNode;
     Ogre::SceneNode* mCamNode;
 
-    // Most recently visited voxel.
-    PolyVox::Vector3DInt32 mVoxel;
+    // Most recently visited chunk (i.e., volume element).
+    PolyVox::Vector3DInt32 mChunk;
 
     // Distance (in voxel chunks) the camera must move before the
     // surface is re-extracted.

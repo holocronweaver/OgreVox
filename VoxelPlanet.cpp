@@ -9,6 +9,8 @@
 #include <limits>
 #include <vector>
 
+#include "PolyVox/MarchingCubesSurfaceExtractor.h"
+
 anl::CMWC4096 rnd2;
 anl::CMWC4096 rnd3;
 
@@ -71,11 +73,7 @@ VoxelPlanet::VoxelPlanet(
       // , mRegionDimensions(65,65,65)
     , mPagingDistance(32.0)
     , shutdownThreads(false)
-//Ogre::ManualObject(name)
 {
-    // newMesh = false;
-    // setDynamic(false);
-
     mSceneNode = sceneMgr->getRootSceneNode()->createChildSceneNode("VoxelPlanet");
 
     int infinity = std::numeric_limits<int>::max() / 10;
@@ -90,7 +88,7 @@ VoxelPlanet::~VoxelPlanet()
     }
 }
 
-// void VoxelPlanet::generateNoise()
+// void VoxelPlanet::setupNoise()
 // {
 //     std::cout << "Begin configuring noise." << std::endl;
 
@@ -204,7 +202,7 @@ VoxelPlanet::~VoxelPlanet()
 // }
 
 
-void VoxelPlanet::generateNoise()
+void VoxelPlanet::setupNoise()
 {
     std::cout << "Begin configuring noise." << std::endl;
 
@@ -262,34 +260,34 @@ void VoxelPlanet::generateNoise()
 }
 
 
-void VoxelPlanet::requestVolume(
-    const PolyVox::ConstVolumeProxy<BYTE>& volume,
-    const PolyVox::Region& region)
+void VoxelPlanet::VoxelPlanetPager::pageIn(
+    const PolyVox::Region& region,
+    PolyVox::PagedVolume<BYTE>::Chunk* chunk)
 {
-    //std::cout << "Begin filling VoxelPlanet." << std::endl;
-    for (int z = region.getLowerCorner().getZ();
-         z <= region.getUpperCorner().getZ(); z++) {
-        for (int y = region.getLowerCorner().getY();
-             y <= region.getUpperCorner().getY(); y++) {
-            for (int x = region.getLowerCorner().getX();
-                 x <= region.getUpperCorner().getX(); x++) {
+    // Change the step size according to octree level (set just before
+    // extracting surface).
+
+    // Evaluations occur on grid points.
+    // if (DEBUG) std::cout << "Begin filling VoxelPlanet." << std::endl;
+    for (int z = region.getLowerZ(); z <= region.getUpperZ(); z++) {
+        for (int y = region.getLowerY(); y <= region.getUpperY(); y++) {
+            for (int x = region.getLowerX(); x <= region.getUpperX(); x++) {
                 // BYTE voxel_value = p_sphere_gradient.get(x,y,z) * 255;
                 BYTE voxel_value = p_sphere_cave_multiply.get(x,y,z) * 255;
-
-                // if (static_cast<double>(voxel_value) != 0)
-                //   std::cout << static_cast<double>(voxel_value) << std::endl;
-
-                volume.setVoxelAt(x, y, z, voxel_value);
+                chunk->setVoxel(x - region.getLowerX(),
+                                y - region.getLowerY(),
+                                z - region.getLowerZ(),
+                                voxel_value);
             }
         }
     }
-    //std::cout << "Done filling VoxelPlanet." << std::endl;
+    // if (DEBUG) std::cout << "Done filling VoxelPlanet." << std::endl;
 }
 
 
-void VoxelPlanet::storeVolume(
-    const PolyVox::ConstVolumeProxy<BYTE>& volume,
-    const PolyVox::Region& region)
+void VoxelPlanet::VoxelPlanetPager::pageOut(
+    const PolyVox::Region& region,
+    PolyVox::PagedVolume<BYTE>::Chunk* chunk)
 {
     std::cout << "Deleting VoxelPlanet volume." << std::endl;
 }
@@ -304,27 +302,23 @@ void VoxelPlanet::update(Ogre::SceneManager* sceneMgr)
 
 void VoxelPlanet::generate(float radius, Ogre::Vector3 origin)
 {
-    //FIXME do something with the radius and origin!
+    //FIXME: do something with the radius and origin!
     mVolumeOrigin = origin;
     mRadius = radius;
 
-    generateNoise();
+    setupNoise();
 
-    mVolumeData = new PolyVox::LargeVolume<BYTE>(
-        &VoxelPlanet::requestVolume,
-        &VoxelPlanet::storeVolume);
-    mVolumeData->setMaxNumberOfBlocksInMemory(8192);
-    mVolumeData->setCompressionEnabled(false);
-    mVolumeData->setMaxNumberOfUncompressedBlocks(8192);
-
-    // PolyVox::Region region(PolyVox::Vector3DInt32(-65,-65,-65),
-    //                        PolyVox::Vector3DInt32(65,65,65));
-    // extractSurface(region);
+    mVolumeData = new PolyVox::PagedVolume<BYTE>(
+        new VoxelPlanetPager(), 256 * 1024 * 1024, mChunkSize);
+    // mVolumeData->setMaxNumberOfBlocksInMemory(8192);
+    // mVolumeData->setCompressionEnabled(false);
+    // mVolumeData->setMaxNumberOfUncompressedBlocks(8192);
 
     mThreads.push_back(
         std::thread(&VoxelPlanet::extractSurface, this)
     );
 }
+
 
 // Producer.
 void VoxelPlanet::enqueueSurfaceExtraction(PolyVox::Region region)
@@ -334,6 +328,7 @@ void VoxelPlanet::enqueueSurfaceExtraction(PolyVox::Region region)
     // Wake consumer.
     extractionQueueNotEmpty.notify_one();
 }
+
 
 // Consumer.
 void VoxelPlanet::extractSurface()
@@ -353,7 +348,7 @@ void VoxelPlanet::extractSurface()
         // Sleep until woken by producer.
         extractionQueueNotEmpty.wait(
             s,
-            [this](){
+            [this]() {
                 return not mSurfaceExtractionQueue.empty();
             }
         );
@@ -364,78 +359,43 @@ void VoxelPlanet::extractSurface()
 void VoxelPlanet::_extractSurface(
     PolyVox::Region region, Ogre::ManualObject* man_obj)
 {
-    PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> mesh;
-
     if (DEBUG) { std::cout << "Begin extracting surface." << std::endl; }
-    PolyVox::MarchingCubesSurfaceExtractor<PolyVox::LargeVolume<BYTE> >
-        //PolyVox::CubicSurfaceExtractorWithNormals<PolyVox::LargeVolume<BYTE> >
-        surface_extractor(mVolumeData, region, &mesh);
-    surface_extractor.execute();
+    
+    auto encodedMesh = extractMarchingCubesMesh(mVolumeData, region);
+    // auto encodedMesh = extractCubicMesh(mVolumeData, region);
+    auto mesh = decodeMesh(encodedMesh);
+    auto vertexOffset = static_cast<PolyVox::Vector3DFloat>(mesh.getOffset());
+    
     if (DEBUG) { std::cout << "Done extracting surface." << std::endl; }
 
+    if (DEBUG) { std::cout << "Begin building manual object." << std::endl; }
     man_obj->setDynamic(false);
     man_obj->clear();
-    if (DEBUG) { std::cout << "Begin building manual object." << std::endl; }
-    // man_obj->begin("SimpleTexture",
-    //                Ogre::RenderOperation::OT_TRIANGLE_LIST);
     man_obj->begin("Terrain",
                    Ogre::RenderOperation::OT_TRIANGLE_LIST);
-    //man_obj->begin("BareWhite",
-    //               Ogre::RenderOperation::OT_TRIANGLE_LIST);
     {
-        const std::vector<PolyVox::PositionMaterialNormal>& vecVertices =
-            mesh.getVertices();
-        const std::vector<uint32_t>& vecIndices = mesh.getIndices();
-        unsigned int uLodLevel = 0;
-        int beginIndex = mesh.m_vecLodRecords[uLodLevel].beginIndex;
-        int endIndex = mesh.m_vecLodRecords[uLodLevel].endIndex;
+        auto& vertices = mesh.getVertices();
+        auto& indices = mesh.getIndices();
 
-        for (int index = beginIndex; index < endIndex; ++index) {
-            const PolyVox::PositionMaterialNormal& vertex =
-                vecVertices[vecIndices[index]];
-            const PolyVox::Vector3DFloat& v3dVertexPos = vertex.getPosition();
-            const PolyVox::Vector3DFloat& v3dVertexNormal = vertex.getNormal();
+        for (auto index : indices) {
+            auto& vertex = vertices[index];
+            auto vertexPos = vertex.position + vertexOffset;
 
-            const PolyVox::Vector3DFloat v3dFinalVertexPos = v3dVertexPos +
-                static_cast<PolyVox::Vector3DFloat>(mesh.m_Region.getLowerCorner());
-            man_obj->position(v3dFinalVertexPos.getX(),
-                              v3dFinalVertexPos.getY(),
-                              v3dFinalVertexPos.getZ());
-            man_obj->normal(v3dVertexNormal.getX(),
-                            v3dVertexNormal.getY(),
-                            v3dVertexNormal.getZ());
+            man_obj->position(vertexPos.getX(),
+                              vertexPos.getY(),
+                              vertexPos.getZ());
+            // man_obj->normal(vertexNorm.getX(),
+            //                 vertexNorm.getY(),
+            //                 vertexNorm.getZ());
             man_obj->colour(1, 0, 0, 0.5);
             // Repeat mesh every 4 units.
-            man_obj->textureCoord(v3dFinalVertexPos.getX()/4.0f,
-                                  v3dFinalVertexPos.getY()/4.0f,
-                                  v3dFinalVertexPos.getZ()/4.0f);
+            man_obj->textureCoord(vertexPos.getX() / 4.0f,
+                                  vertexPos.getY() / 4.0f,
+                                  vertexPos.getZ() / 4.0f);
         }
     }
+    // end();
     if (DEBUG) { std::cout << "Done building manual object." << std::endl; }
-    //end();
-    //newMesh = true;
-}
-
-
-/** Raycast from a given position and direction for a specific
-    distance.
- **/
-Raycast VoxelPlanet::raycast(
-    Ogre::Vector3 origin, Ogre::Vector3 direction, float distance)
-{
-    Raycast raycast;
-    //origin = origin / 90;
-    PolyVox::Vector3DFloat orig(origin.x,origin.y,origin.z);
-    PolyVox::Vector3DFloat dir(direction.x,direction.y,direction.z);
-    dir.normalise();
-    dir *= distance;
-
-    PolyVox::RaycastResult raycast_result = PolyVox::raycastWithDirection(
-        mVolumeData, orig, dir, raycast
-    );
-    raycast.result = raycast_result;
-
-    return raycast;
 }
 
 
@@ -447,25 +407,17 @@ void VoxelPlanet::render(Ogre::SceneManager* sceneMgr)
     //TODO: When switching to OpenGL 3+, the main object
     // can be ended by other threads than main.
     if (not mSurfaceRenderQueue.empty()) {
-        //std::cout << "new mesh!" << std::endl;
+        if (DEBUG) std::cout << "new mesh!" << std::endl;
         mSurfaceRenderMutex.lock();
         Ogre::ManualObject* man_obj = mSurfaceRenderQueue.front();
-        //Ogre::SceneNode* man_obj_node;
         man_obj->end();
         mSurfaceRenderQueue.pop();
-        //TODO destroy previous manual object
         if (sceneMgr->hasSceneNode(man_obj->getName()))
         {
             sceneMgr->destroyManualObject(man_obj->getName());
-            //mManualObjectNode = sceneMgr->getSceneNode(man->getName());
         }
-        // convertToMesh("VoxelPlanetMesh");
-        // Ogre::Entity * voxelPlanetEntity =
-        //   mSceneMgr->createEntity("VoxelPlanetEntity","VoxelPlanetMesh");
-        // mSceneNode->attachObject(voxelPlanetEntity);
         mSceneNode->detachAllObjects();
         mSceneNode->attachObject(man_obj);
-        //mSceneNode->setVisible(true);
         mSurfaceRenderMutex.unlock();
     }
 }
@@ -477,8 +429,8 @@ void VoxelPlanet::page()
     
     if (chunk == mChunk
         || abs((chunk - mChunk).length()) < mPagingDistance) {
-        if (DEBUG)
-            std::cout << "distance: " << (chunk - mChunk).length() << std::endl;
+        // if (DEBUG)
+        //     std::cout << "distance: " << (chunk - mChunk).length() << std::endl;
         return;
     }
 
@@ -504,12 +456,12 @@ PolyVox::Vector3DInt32 VoxelPlanet::getCurrentChunk()
         floor(pos.z / mChunkSize / 10)
     );
 
-    if (DEBUG)
-    {
-        std::cout << "current pos: " << pos << std::endl;
-        std::cout << "current chunk: " << chunk << std::endl;
-        std::cout << "mChunk: " << mChunk << std::endl;
-    }
+    // if (DEBUG)
+    // {
+    //     std::cout << "current pos: " << pos << std::endl;
+    //     std::cout << "current chunk: " << chunk << std::endl;
+    //     std::cout << "mChunk: " << mChunk << std::endl;
+    // }
 
     return chunk;
 }

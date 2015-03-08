@@ -7,10 +7,9 @@
 
 #include "OgreManualObject.h"
 
-#include "PolyVoxCore/CubicSurfaceExtractorWithNormals.h"
-#include "PolyVoxCore/MarchingCubesSurfaceExtractor.h"
-#include "PolyVoxCore/SurfaceMesh.h"
-#include "PolyVoxCore/LargeVolume.h"
+#include "PolyVox/CubicSurfaceExtractor.h"
+#include "PolyVox/MarchingCubesSurfaceExtractor.h"
+#include "PolyVox/PagedVolume.h"
 
 typedef uint8_t BYTE;
 
@@ -27,10 +26,12 @@ class LargeVoxelSphere : public Ogre::ManualObject
   PolyVox::LargeVolume<BYTE>* mVolumeData;
   //static PolyVox::Vector3DFloat mVolCenter;
   //static int mRadius;
-  static void requestVolume(const PolyVox::ConstVolumeProxy<BYTE>& volume,
-                     const PolyVox::Region& region);
-  static void storeVolume(const PolyVox::ConstVolumeProxy<BYTE>& volume,
-                   const PolyVox::Region& region);
+    
+    class VoxelSpherePager : public PolyVox::PagedVolume<BYTE>::Pager
+    {
+        void pageIn(const PolyVox::Region& region, PolyVox::PagedVolume<BYTE>::Chunk* chunk);
+        void pageOut(const PolyVox::Region& region, PolyVox::PagedVolume<BYTE>::Chunk* chunk);
+    };
 };
 
 #endif // #ifndef __LargeVoxelSphere_h_

@@ -7,9 +7,9 @@
 #define __OgreVox_h_
 
 #include "BareOgre.h"
-#include "VoxelSphere.h"
+// #include "VoxelSphere.h"
 #include "LargeVoxelSphere.h"
-#include "VoxelTerrain.h"
+// #include "VoxelTerrain.h"
 #include "VoxelPlanet.h"
 
 class OgreVox : public BareOgre
@@ -27,12 +27,9 @@ protected:
     // void mouseReleased(const SDL_MouseButtonEvent& event);
 
 private:
-    VoxelSphere* mVoxelSphere;
-    Ogre::SceneNode* mVoxelSphereNode;
-    LargeVoxelSphere* mLargeVoxelSphere;
-    Ogre::SceneNode* mLargeVoxelSphereNode;
+    // VoxelSphere* mVoxelSphere;
+    // LargeVoxelSphere* mLargeVoxelSphere;
     // VoxelTerrain* mVoxelTerrain;
-    // Ogre::SceneNode* mVoxelTerrainNode;
     VoxelPlanet* mVoxelPlanet;
 
     Ogre::SceneNode* mMarkerNode;
