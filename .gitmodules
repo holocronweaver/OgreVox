@@ -1,6 +1,6 @@
 [submodule "BareOgre"]
 	path = BareOgre
-	url = git@github.com:holocronweaver/BareOgre.git
+	url = https://github.com/holocronweaver/BareOgre.git
 [submodule "lib/polyvox"]
 	path = lib/polyvox
-	url = git@bitbucket.org:holocronweaver/polyvox.git
+	url = https://holocronweaver@bitbucket.org/holocronweaver/polyvox.git
